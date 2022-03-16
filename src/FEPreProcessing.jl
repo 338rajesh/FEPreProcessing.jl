@@ -8,6 +8,7 @@ module FEPreProcessing
 
     include("FEPrepBase.jl")
     include("mesh_data.jl")
+    include("assembly.jl")
     include("UnitCellFEModel.jl")
         
     export unit_cell_FEModel
