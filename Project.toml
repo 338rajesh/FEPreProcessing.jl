@@ -3,6 +3,12 @@ uuid = "4e1f3283-c9c5-47e5-ae97-911e3d9423b6"
 authors = ["Rajesh Nakka"]
 version = "0.1.0"
 
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+
 [compat]
 julia = "1.6"
 

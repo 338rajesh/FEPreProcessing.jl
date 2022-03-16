@@ -1,5 +1,15 @@
 module FEPreProcessing
+    using LinearAlgebra
+    using StructArrays
+    using StaticArrays
+    using Parameters
 
-# Write your package code here.
+    const IF64 = Union{Int64, Float64}
+
+    include("FEPrepBase.jl")
+    include("mesh_data.jl")
+    include("UnitCellFEModel.jl")
+        
+    export unit_cell_FEModel
 
 end
