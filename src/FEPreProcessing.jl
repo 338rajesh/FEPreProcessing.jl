@@ -2,6 +2,7 @@ module FEPreProcessing
     using LinearAlgebra
     using StructArrays
     using StaticArrays
+    using SparseArrays
     using Parameters
 
     const IF64 = Union{Int64, Float64}
