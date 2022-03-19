@@ -275,7 +275,6 @@ function get_rve_node_groups(
 end
 
 
-# CRITICAL_BUG MeshPeriodicityError: Unable to find the corresponding node for a node, with tag 2404, located in group xp_xn. Expecting that there is a trouble in finding the closest node in the opposite group.
 
 function node_pairs(
     ng1::Matrix{IF64},
@@ -284,8 +283,14 @@ function node_pairs(
     pair_tag::String;
     ϵ::Float64 = 1e-06
 )::Vector{FENodePair}
-    lx, ly, lz = shift
+    δx, δy, δz = shift
     node_pairs::Vector{FENodePair} = []
+    #
+    # rounding to a place higher than tolerance order. This is to avoid the influence of machine
+    # precision on the sorting process.
+    ng1[2:end, :] = round.(ng1[2:end, :]; digits=(1 + ceil(Int, log10(1/ϵ))))  # rounding to a place higher than tolerance order
+    ng2[2:end, :] = round.(ng2[2:end, :]; digits=(1 + ceil(Int, log10(1/ϵ))))  
+    #
     sorted_ng1 = sortslices(ng1, dims = 2, by = x -> (x[2], x[3], x[4]), rev = false)
     sorted_ng2 = sortslices(ng2, dims = 2, by = x -> (x[2], x[3], x[4]), rev = false)
     if size(sorted_ng1, 2) != size(sorted_ng2, 2)
@@ -296,9 +301,9 @@ function node_pairs(
         ang1_nt, ang1_nx, ang1_ny, ang1_nz = sorted_ng1[:, i]
         ang2_nt, ang2_nx, ang2_ny, ang2_nz = sorted_ng2[:, i]  # TODO check if vectorization increases performance
         if (
-            abs(abs(ang1_nx - ang2_nx) - lx) < ϵ &&
-            abs(abs(ang1_ny - ang2_ny) - ly) < ϵ &&
-            abs(abs(ang1_nz - ang2_nz) - lz) < ϵ
+            abs(abs(ang1_nx - ang2_nx) - δx) < ϵ &&
+            abs(abs(ang1_ny - ang2_ny) - δy) < ϵ &&
+            abs(abs(ang1_nz - ang2_nz) - δz) < ϵ
         )
             push!(node_pairs, FENodePair(pair_tag, ang1_nt, ang2_nt))
         else
@@ -401,7 +406,7 @@ end
 # ==================================================================================#
 
 """
-    get_felement_sets() -> NTuple{length(element_connectivity), AbstractFElementSet}
+    get_felement_sets() -> Vector{AbstractFElementSet}
     
  Args:
  -----
@@ -414,85 +419,94 @@ end
  - **print_debug_info**::Bool=false,
 
 """
-function get_felement_sets(
-    element_connectivity::Dict{Int64,Matrix{Int64}},
-    nodal_data::Dict{Int64,Tuple{Vararg{Float64}}},
+
+
+function make_finite_element_set(
+    element_type::Int,
+    element_connectivity::Matrix{Int},
+    nodal_data::Dict{Int, Vector{Float64}};
+    elset_tag::Union{String, Int} = "Element-Set",
+    material::Union{Nothing, Material} = nothing,
+    num_ip::Int64 = -1,
+    gq_order::Int64 = -1,
+)::FiniteElementSet
+    #
+    println("Making element set with ID ", elset_tag)
+    #
+    elements::Vector{AbstractFElement} = AbstractFElement[]
+    ivols::Vector{Float64} = Float64[]
+    shfg_xyz::Vector{SMatrix} = SMatrix[]
+    num_node_per_fele::Int = size(element_connectivity, 1) - 1  # first row is for ele_tag => size-1
+    # num_fele::Int = size(element_connectivity, 2)
+    num_shape_func::Int = num_node_per_fele
+    dim, fele_data_type, integration_points = get_felement_properties(
+        element_type, gq_order, num_ip
+    )
+    parent_csys_shf_data = get_shape_functions_info(
+        fele_data_type,
+        integration_points
+    )
+    #
+    # Running over each element of the connectivity table.
+    for a_ele_info in eachcol(element_connectivity)
+        empty!(ivols)
+        empty!(shfg_xyz)
+        ele_tag = a_ele_info[1]
+        ele_nodes = a_ele_info[2:end]
+        nodal_coordinates = [nodal_data[i][1:dim] for i in ele_nodes]
+        for (a_ip, shfg_parent) in parent_csys_shf_data
+            Jacobian = zeros(Float64, dim, dim)
+            # run over pairs of coordinates and shape function data
+            for (k2, a_node_coor) in enumerate(nodal_coordinates)
+                Jacobian +=
+                    (shfg_parent[2:end, k2:k2] * reshape(collect(a_node_coor), 1, :))
+            end
+            Jacobian_det = det(Jacobian)
+            @assert Jacobian_det > 0.0 "Determinant of a Jacobian must be >= 0.0 but the element $(ele_tag) has $Jacobian_det."
+            push!(ivols, Jacobian_det * a_ip.wt)
+            aip_shf_grad_xyz =
+                [shfg_parent[1:1, :]; inv(Jacobian) * shfg_parent[2:end, :]]
+            push!(shfg_xyz, SMatrix{1 + dim, num_shape_func, Float64}(aip_shf_grad_xyz))
+        end
+        push!(
+            elements,
+            fele_data_type(
+                ele_tag,
+                SVector{num_node_per_fele, Int}(ele_nodes),
+                tuple(ivols...),
+                tuple(shfg_xyz...),
+            )
+        )  # end of updating elements vector.
+    end
+    return FiniteElementSet(
+        elset_tag,
+        elements,
+        material,
+    )
+end
+
+
+function make_finite_element_sets(
+    element_connectivities::Dict{Int64, Matrix{Int64}},
+    nodal_data::Dict{Int64, Vector{Float64}},
+    ele_material::Material,
     elset_tag::Union{Int64,String};
     num_ip::Int64 = -1,
     gq_order::Int64 = -1,
-    print_debug_info::Bool = false
-)::Vector{AbstractFElementSet}
+)::Vector{FiniteElementSet}
     #
-    println("Preparing $elset_tag...!")
-    element_sets::Vector{AbstractFElementSet} = []
-    elements::Vector{AbstractFElement} = []
-    num_nodes::Int64 = 0
-    num_shf::Int64 = 0
-    num_felements::Int64 = 0
-    ivols::Vector{Float64} = []
-    shfg_xyz::Vector{SMatrix} = []
-    #
-    # TODO add element type assertion
-    #
-    for (ele_type, ele_con) in element_connectivity
-        empty!(elements)
-        num_nodes = size(ele_con)[1] - 1  # as the first row corresponds to element tag
-        num_felements = size(ele_con)[2]
-        num_shf = num_nodes
-        dim, fele_data_type, integration_points =
-            get_felement_properties(ele_type, gq_order, num_ip)
-        # num_ip = length(integration_points)
-        if print_debug_info
-            println(
-                "Element Data Type: $fele_data_type,
-                Number of elements :: $(num_felements),
-                Number of nodes/element :: $num_nodes,
-                Integration points :: $integration_points,",
-            )
-        end
-        #
-        # get shape functions and its gradients at gauss points in parent coordinate system
-        shf_data_parent_csys = get_shape_functions_info(fele_data_type, integration_points)
-
-        # get Jacobian and its determinant
-        for a_col in eachcol(ele_con)
-            ele_tag, ele_nodes = a_col[1], a_col[2:end]
-            nodal_coordinates = (nodal_data[i][1:dim] for i in ele_nodes)
-            empty!(ivols)
-            empty!(shfg_xyz)
-            # run over each gauss point and get Jacobian and its determinant
-            for (a_ip, shfg_parent) in shf_data_parent_csys
-                Jacobian = zeros(Float64, dim, dim)
-                # run over pairs of coordinates and shape function data
-                for (k2, a_node_coor) in enumerate(nodal_coordinates)
-                    Jacobian +=
-                        (shfg_parent[2:end, k2:k2] * reshape(collect(a_node_coor), 1, :))
-                end
-                Jacobian_det = det(Jacobian)
-
-                @assert Jacobian_det > 0.0 "Determinant of a Jacobian must be >= 0.0 but the element $(ele_tag) has $Jacobian_det."
-
-                push!(ivols, Jacobian_det * a_ip.wt)
-                #
-                aip_shf_grad_xyz =
-                    [shfg_parent[1:1, :]; inv(Jacobian) * shfg_parent[2:end, :]]
-                push!(shfg_xyz, SMatrix{1 + dim,num_shf,Float64}(aip_shf_grad_xyz))
-            end
-            elements = [
-                elements
-                fele_data_type(
-                    tag = ele_tag,
-                    node_tags = SVector{num_nodes}(ele_nodes),
-                    ip_volumes = tuple(ivols...),
-                    sfgrad_xyz = tuple(shfg_xyz...),
-                )
-            ]
-        end
-        #
-        push!(element_sets, FElementSet(elset_tag, elements))
-    end
-    return element_sets
+    return [make_finite_element_set(
+        a_ele_type,
+        a_ele_type_ele_connectivity,
+        nodal_data;
+        elset_tag=elset_tag,
+        material=ele_material,
+        num_ip=num_ip,
+        gq_order=gq_order,
+    ) for (a_ele_type, a_ele_type_ele_connectivity) in element_connectivities]
 end
+
+
 
 # =================================================================================
 #                       Prepare Node Sets
@@ -513,10 +527,10 @@ function make_fe_node_set(
     node_tags::Union{Vector{Int64},Vector{Int32}},
     nodal_coor::Matrix{Float64};
     nodal_dof::Tuple{Vararg{String}} = ("x", "y", "z")
-)::Dict{Int64,Tuple{Vararg{Float64}}}  # TODO make node sets object oriented
+)::Dict{Int64, Vector{Float64}}  # TODO make node sets object oriented
     #
-    @assert size(nodal_coor)[1] >= 2 "Number of columns must be 2 or 3 being in the order of x, y, z"
-    @assert length(node_tags) == size(nodal_coor, 2) "Number of node tags and number of rows in nodal coordinates matrix doesn't match; $(length(node_tags)) ≠ $(size(nodal_coor)[1]))"
+    @assert size(nodal_coor, 1) >= 2 "Number of rows must be 2 or 3 being in the order of x, y, z"
+    @assert length(node_tags) == size(nodal_coor, 2) "Number of node tags and number of columns in nodal coordinates matrix doesn't match; $(length(node_tags)) ≠ $(size(nodal_coor)[1]))"
     #
     req_dofs::Vector{Int64} = []
     for a_dof in nodal_dof
@@ -529,8 +543,229 @@ function make_fe_node_set(
         end
     end
     #
-    nodal_coor = nodal_coor[req_dofs, :]
+    nodal_coor = nodal_coor[req_dofs, :]  # extracting dof, as required.
     #
     node_tags = convert(Vector{Int64}, node_tags)
-    return Dict((i, tuple(j...)) for (i, j) in zip(node_tags, eachcol(nodal_coor)))
+    #
+    return Dict((i, j) for (i, j) in zip(node_tags, eachcol(nodal_coor)))
 end
+
+# =================================================================================
+#                       Misc.
+# =================================================================================
+
+function get_total_volume_of_elements(
+    finite_element_sets::Vector{FiniteElementSet};
+    print_info::Bool = false,
+)
+    ele_set_volumes::Vector{Float64} = Float64[]
+    element_counter::Int = 0
+    a_ele_set_vol::Float64 = 0.0
+    if print_info
+        println("\n EVALUATING VOLUMES OF ELEMENT SETS...!")
+    end
+    for a_finite_element_set in finite_element_sets
+        a_ele_set_vol = 0.0
+        for a_finte_element in a_finite_element_set.elements
+            a_ele_set_vol += sum(a_finte_element.ip_volumes)
+            element_counter += 1
+        end    
+        if print_info
+            println(
+                "Volume of element set with ID: ", a_finite_element_set.tag, " is ", a_ele_set_vol
+                )
+        end
+        push!(ele_set_volumes, a_ele_set_vol)
+    end
+    total_volume::Float64 = sum(ele_set_volumes)
+    if print_info
+        println("Sum of volumes of ", element_counter," elements is  ", total_volume)    
+    end
+    return total_volume
+end
+
+
+
+
+
+# ================================================
+#                   Archives
+# ================================================
+
+# function get_felement_sets_a(
+#     element_connectivity::Dict{Int64,Matrix{Int64}},
+#     nodal_data::Dict{Int64,Vector{Float64}},
+#     elset_tag::Union{Int64,String};
+#     num_ip::Int64 = -1,
+#     gq_order::Int64 = -1,
+#     print_debug_info::Bool = false
+# )::Vector{AbstractFElementSet}
+#     #
+#     println("Preparing $elset_tag...!")
+#     element_sets::Vector{AbstractFElementSet} = []
+#     elements::Vector{AbstractFElement} = []
+#     num_nodes::Int64 = 0
+#     num_shf::Int64 = 0
+#     num_felements::Int64 = 0
+#     ivols::Vector{Float64} = Float64[]
+#     shfg_xyz::Vector{SMatrix} = SMatrix[]
+#     ele_tag::Int = 0
+#     ele_nodes::Vector{Int} = Int[]
+#     #
+#     # TODO add element type assertion
+#     tot_vol::Float64 = 0.0   # *****************
+#     #
+#     # Running over each element type, with their element_connectivity information.
+#     for (ele_type, ele_con) in element_connectivity
+#         empty!(elements)
+#         num_nodes = size(ele_con)[1] - 1  # as the first row corresponds to element tag
+#         num_felements = size(ele_con)[2]
+#         num_shf = num_nodes
+#         dim, fele_data_type, integration_points = get_felement_properties(
+#             ele_type,
+#             gq_order,
+#             num_ip
+#         )
+#         #
+#         # For the given element type, get shape functions and its gradients at
+#         # gauss points in parent coordinate system
+#         shf_data_parent_csys = get_shape_functions_info(
+#             fele_data_type,
+#             integration_points
+#         )
+#         #
+#         if print_debug_info
+#             println(
+#                 "Element Data Type: $fele_data_type,
+#                 Number of elements :: $(num_felements),
+#                 Number of nodes/element :: $num_nodes,
+#                 Integration points :: $integration_points,",
+#             )
+#         end
+#         #
+#         # Running over each element of the given type.
+#         for a_col in eachcol(ele_con)
+#             empty!(ivols)
+#             empty!(shfg_xyz)
+#             #
+#             ele_tag, ele_nodes = a_col[1], a_col[2:end]
+#             nodal_coordinates = (nodal_data[i][1:dim] for i in ele_nodes)  # NTuple{N, Vector{Float64}}
+#             #
+#             # run over each gauss point and get Jacobian and its determinant
+#             for (a_ip, shfg_parent) in shf_data_parent_csys
+#                 Jacobian = zeros(Float64, dim, dim)
+#                 # run over pairs of coordinates and shape function data
+#                 for (k2, a_node_coor) in enumerate(nodal_coordinates)
+#                     Jacobian +=
+#                         (shfg_parent[2:end, k2:k2] * reshape(collect(a_node_coor), 1, :))
+#                 end
+#                 Jacobian_det = det(Jacobian)
+
+#                 @assert Jacobian_det > 0.0 "Determinant of a Jacobian must be >= 0.0 but the element $(ele_tag) has $Jacobian_det."
+
+#                 push!(ivols, Jacobian_det * a_ip.wt)
+#                 #
+#                 aip_shf_grad_xyz =
+#                     [shfg_parent[1:1, :]; inv(Jacobian) * shfg_parent[2:end, :]]
+#                 push!(shfg_xyz, SMatrix{1 + dim,num_shf,Float64}(aip_shf_grad_xyz))
+#             end
+#             elements = [
+#                 elements
+#                 fele_data_type(
+#                     tag = ele_tag,
+#                     node_tags = SVector{num_nodes}(ele_nodes),
+#                     ip_volumes = ivols,
+#                     sfgrad_xyz = shfg_xyz,
+#                 )
+#             ]  
+#             tot_vol += sum(ivols)  # *****************
+#         end
+#         #
+#         push!(element_sets, FiniteElementSet(elset_tag, elements))
+#     end 
+#     println("Total Volume by brute sum ", tot_vol)   # *****************
+#     return element_sets
+# end
+
+
+# function get_felement_sets(
+#     element_connectivity::Dict{Int64,Matrix{Int64}},
+#     nodal_data::Dict{Int64, Vector{Float64}},
+#     elset_tag::Union{Int64,String};
+#     num_ip::Int64 = -1,
+#     gq_order::Int64 = -1,
+#     print_debug_info::Bool = false,
+# )::Vector{AbstractFElementSet}
+#     #
+#     println("Preparing $elset_tag...!")
+#     element_sets::Vector{AbstractFElementSet} = AbstractFElementSet[]
+#     elements::Vector{AbstractFElement} = AbstractFElement[]
+#     num_nodes::Int64 = 0
+#     num_shf::Int64 = 0
+#     num_felements::Int64 = 0
+#     ivols::Vector{Float64} = []
+#     shfg_xyz::Vector{SMatrix} = []
+#     #
+#     #
+#     for (ele_type, ele_con) in element_connectivity
+#         # @assert ele_type in fe_libray_g "Element type $ele_type (GMSH id) is not implemented as of now..!"
+#         empty!(elements)
+#         num_nodes = size(ele_con)[1] - 1  # as the first row corresponds to element tag
+#         num_felements = size(ele_con)[2]
+#         dim, fele_data_type, integration_points =
+#             get_felement_properties(ele_type, gq_order, num_ip)
+#         num_ip = length(integration_points)
+#         num_shf = num_nodes
+#         if print_debug_info
+#             println(
+#                 "For $fele_data_type, \nNumber of elements :: $(num_felements), \nNumber of nodes/element :: $num_nodes, \nIntegration points :: $integration_points,",
+#             )
+#         end
+#         #
+#         # get shape functions and its gradients at gauss points in parent coordinate system
+#         shf_data_parent_csys = get_shape_functions_info(fele_data_type, integration_points)
+
+#         # get Jacobian and its determinant
+#         for (ele_tag, ele_nodes...) in eachcol(ele_con)
+#             nodal_coordinates = (nodal_data[i][1:dim] for i in ele_nodes)
+#             empty!(ivols)
+#             empty!(shfg_xyz)
+#             # run over each gauss point
+#             for (a_ip, shfg_parent) in shf_data_parent_csys
+#                 Jacobian = zeros(Float64, dim, dim)
+#                 # run over pairs of coordinates and shape function data
+
+#                 for (k2, a_node_coor) in enumerate(nodal_coordinates)
+#                     Jacobian +=
+#                         (shfg_parent[2:end, k2:k2] * reshape(collect(a_node_coor), 1, :))
+#                 end
+
+#                 Jacobian_det = det(Jacobian)
+
+#                 @assert Jacobian_det > 0.0 "Determinant of a Jacobian must be >= 0.0 but $Jacobian_det observed on element $(ele_tag)"
+
+#                 push!(ivols, Jacobian_det * a_ip.wt)
+#                 #
+#                 aip_shf_grad_xyz =
+#                     [shfg_parent[1:1, :]; inv(Jacobian) * shfg_parent[2:end, :]]
+#                 push!(shfg_xyz, SMatrix{1 + dim,num_shf,Float64}(aip_shf_grad_xyz))
+#             end
+#             elements = [
+#                 elements
+#                 fele_data_type(
+#                     tag = ele_tag,
+#                     node_tags = SVector(ele_nodes...),
+#                     ip_volumes = ivols,
+#                     sfgrad_xyz = shfg_xyz,
+#                 )
+#             ]
+#         end
+#         #
+#         push!(element_sets, FiniteElementSet(elset_tag, elements))
+#     end
+#     return element_sets
+# end
+
+
+
+
