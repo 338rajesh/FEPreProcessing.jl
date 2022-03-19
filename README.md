@@ -6,27 +6,42 @@ This Julia module contains methods capable of creating Finite Element model whic
 
 From Julia REPL, execute the following,
 
+
 ```julia
-julia> ]add https://github.com/338rajesh/FEPreProcessing.jl
+julia> using Pkg
+julia> Pkg.add("https://github.com/338rajesh/FEPreProcessing.jl#main")
 ```
+
+> **Note**: for development version, replace `main` with `dev` in the above link.
 
 ## Documentation
 
-`FEPreProcessing.jl` exports a single function `unit_cell_FEModel()` which takes the following set of arguments.
+  This module exports the following single function.
 
-* Positional Arguments
-  * `ntags::Vector{Int}`, Node Tags
-  * `ncoor::Matrix{Float64}`, Nodal Coordinates matrix. Here each column of `ncoor` should corresponds to a *finite element* node.
-  * `phases_data::Dict`, data corresponding to each phase of the unit cell can be given supplied as the following key-value pairs.
-    * **key**: phase *finite element* set ID.
-    * **value**: A tuple of the folloing two values
-      * **phase *finite element* connectivity**, of `Matrix{Int}` type where each column corresponds to a *finite element*. In each of these columns, first element is *finite element* tag and the remaining are *finite element* node tags.
-      * ***Material***,
+  ```julia
+  julia> using FEPreProcessing
+  julia> uc_fea_model = make_unit_cell_FEA_model(ntags, ncoor, phases_data; <kwargs>)
+  ```
+  where,
+* `ntags::Vector{Int}`, Node Tags
+* `ncoor::Matrix{Float64}`, Nodal Coordinates matrix. Here each column of `ncoor` should corresponds to a *finite element* node.
+* `phases_data::Dict`, data corresponding to each phase of the unit cell can be given supplied as the following key-value pairs.
+  * **key**: phase *finite element* set ID.
+  * **value**: A tuple of the folloing two values
+    * **phase *finite element* connectivity**, of `Matrix{Int}` type where each column corresponds to a *finite element*. In each of these columns, first element is *finite element* tag and the remaining are *finite element* node tags.
+    * ***Material***,
 
-* Keyword Arguments
+* kwargs, Keyword Arguments
   * `ϵ::Float64 = 1e-06`, small parameter/tolerance to be used in the modelling process.
   * `numIP::Int = 4`, Number of integration points to be used.
   * `gqOrder::Int = 2`, Gass quadrature order
+
+* returns, `UnitCellFEModel:: Dict{String, Any}` 
+  * all_node_set
+  * element_sets
+  * pc_node_tags
+  * constraing_ntag
+
 
 ### Analysis Types
 
