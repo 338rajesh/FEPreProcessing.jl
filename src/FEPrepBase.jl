@@ -234,11 +234,21 @@ end
 abstract type AbstractFElementSet end
 
 """Structure for storing a particular type of finite elements"""
-struct FElementSet <: AbstractFElementSet
+@with_kw struct FiniteElementSet <: AbstractFElementSet
     tag::Union{Int64,String}
     elements::Vector{AbstractFElement}
+    material::Union{Material, Nothing} = nothing
 end
 
+""" PhaseFiniteElementConnectivity
+
+Phase is the union of different types of elements, with same material
+type"""
+struct PhaseFiniteElementConnectivity
+    tag::String
+    ele_conn::Dict{Int, Matrix{Int}}
+    material::Material
+end
 
 raw"""
 
