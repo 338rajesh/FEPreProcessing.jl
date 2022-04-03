@@ -6,7 +6,6 @@ This Julia module contains methods capable of creating Finite Element model whic
 
 From Julia REPL, execute the following,
 
-
 ```julia
 julia> using Pkg
 julia> Pkg.add("https://github.com/338rajesh/FEPreProcessing.jl#main")
@@ -22,7 +21,9 @@ julia> Pkg.add("https://github.com/338rajesh/FEPreProcessing.jl#main")
   julia> using FEPreProcessing
   julia> uc_fea_model = make_unit_cell_FEA_model(ntags, ncoor, phases_data; <kwargs>)
   ```
+
   where,
+
 * `ntags::Vector{Int}`, Node Tags
 * `ncoor::Matrix{Float64}`, Nodal Coordinates matrix. Here each column of `ncoor` should corresponds to a *finite element* node.
 * `phases_data::Dict`, data corresponding to each phase of the unit cell can be given supplied as the following key-value pairs.
@@ -36,12 +37,11 @@ julia> Pkg.add("https://github.com/338rajesh/FEPreProcessing.jl#main")
   * `numIP::Int = 4`, Number of integration points to be used.
   * `gqOrder::Int = 2`, Gass quadrature order
 
-* returns, `UnitCellFEModel:: Dict{String, Any}` 
+* returns, `UnitCellFEModel:: Dict{String, Any}`
   * all_node_set
   * element_sets
   * pc_node_tags
   * constraing_ntag
-
 
 ### Analysis Types
 

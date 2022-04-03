@@ -381,7 +381,6 @@ function make_rve_node_pairs(
     node_coordinates::Matrix{Float64};
     small_para::Float64 = 1e-06
 )::Vector{FENodePair}
-    println("Making RVE node pairs...!")
     if length(node_tags) != size(node_coordinates, 2)
         throw(
             DimensionMismatch(
@@ -430,8 +429,6 @@ function make_finite_element_set(
     num_ip::Int64 = -1,
     gq_order::Int64 = -1,
 )::FiniteElementSet
-    #
-    println("Making element set with ID ", elset_tag)
     #
     elements::Vector{AbstractFElement} = AbstractFElement[]
     ivols::Vector{Float64} = Float64[]
