@@ -147,7 +147,6 @@ get_thermal_conductivity_tensor(mat::IsotropicMaterial) = [mat.K 0.0 0.0;0.0 mat
 get_thermal_expansion_vector(mat::TransverselyIsotropicMaterial) = reshape([mat.alpha_ij[:alpha_11] mat.alpha_ij[:alpha_22] mat.alpha_ij[:alpha_22] 0.0 0.0 0.0], 6, 1)
 
 
-
 # =====================================================
 #           GENERAL methods
 # =====================================================
@@ -161,7 +160,8 @@ function get_material_tensors(
     elseif analysis_type==Thermo_Elastic_3DFEA
         return (
             get_elastic_tensor(analysis_type, mat),
-            get_thermal_expansion_vector(mat), 
+            get_thermal_expansion_vector(mat),
+            mat.cv,
         )
     elseif analysis_type==Thermal_Conductivity_3DFEA
         return get_thermal_conductivity_tensor(mat)

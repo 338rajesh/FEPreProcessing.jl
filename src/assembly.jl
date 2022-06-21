@@ -148,7 +148,6 @@ function preapre_constraints_matrix_csc(
     # cnt: child node tag
     # hdbc: homogenous Dirichlet boundary conditions
     # ==============================
-    println("Preparing CSC type matrix for eliminating child node tags..!")
     dof_quantities = get_nodal_dof(analysis_type)
     dof_per_node = length(dof_quantities)
     child_node_tags::Vector{T} = [i[2] for i in parent_child_node_tag_pairs]

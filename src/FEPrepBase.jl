@@ -240,6 +240,35 @@ abstract type AbstractFElementSet end
     material::Union{Material, Nothing} = nothing
 end
 
+
+function get_num_ele(fele_set::FiniteElementSet)::Dict{DataType, Int}
+    fele_type_summary::Dict{DataType, Int} = Dict{DataType, Int}()
+    for a_fele in fele_set.elements
+        fele_type = typeof(a_fele)
+        if fele_type in keys(fele_type_summary)
+            fele_type_summary[fele_type] += 1
+        else
+            fele_type_summary[fele_type] = 1
+        end
+    end
+    return fele_type_summary
+end
+
+function get_num_ele(fele_sets::Vector{FiniteElementSet})
+    fele_type_summary::Dict{DataType, Int} = Dict{DataType, Int}()
+    for a_fele_set in fele_sets
+        aset_fele_type_summary = get_num_ele(a_fele_set)
+        for (ak, av) in aset_fele_type_summary
+            if ak in keys(fele_type_summary)
+                fele_type_summary[ak] += av
+            else
+                fele_type_summary[ak] = av
+            end
+        end
+    end
+    return fele_type_summary
+end 
+
 """ PhaseFiniteElementConnectivity
 
 Phase is the union of different types of elements, with same material
@@ -448,6 +477,22 @@ function get_felement_properties(
         ele_data_type,
         get_integration_points(ele_data_type; num_ip = num_ip, gq_order = gq_order),
         )
+end
+
+
+function get_num_nodes_per_ele(e::DataType)
+    num_nodes_per_ele::Int = if (e===C3D8) || (e===CPS8)
+        8
+    elseif e===C3D6
+        6
+    elseif (e===C3D4) || (e===CPS4)
+        4
+    elseif e===CPS3
+        3
+    else
+        @error "Element datatype $e is illegal, please provide correct element data type!."
+    end
+    return num_nodes_per_ele
 end
 
 
