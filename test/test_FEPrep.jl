@@ -38,7 +38,7 @@ const rectangular_inclusions_data = Inclusion_data(
     shape = Rectangle,
     size_params = Dict(:SMJRX => Normal(2.0, 0.0), :SMNRX => Normal(1.0, 0.0), :CRAD => Normal(0.2, 0.0),),
 )
-inclusions_data = UCG.generate(ruc_info, (circ_inc,),)
+inclusions_data = generate_unit_cell(ruc_info, (circ_inc,),)
 
 # ============================================
 #       MODELLING and MESHING in GMESH
