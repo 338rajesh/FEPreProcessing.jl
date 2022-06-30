@@ -367,7 +367,7 @@ function node_pairs(
         )
             push!(node_pairs, FENodePair("$parent_id-$apg_nt-$child_id-$acg_nt", apg_nt, acg_nt))
         else
-            throw(MeshPeriodicityError(ang1_nt, pair_tag))
+            throw(MeshPeriodicityError(apg_nt, "$parent_id-$apg_nt-$child_id-$acg_nt"))
         end
     end
     return node_pairs
