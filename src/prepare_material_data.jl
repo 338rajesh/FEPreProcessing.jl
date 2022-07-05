@@ -64,7 +64,7 @@ function get_elastic_tensor(
             0.0 0.0 0.5*(1-nu)
         ]
     else
-        @error "Encountered an unknown analysis type for returning elastic tensor"
+        @error "Encountered an unknown analysis type $analysis_type while finding elastic tensor"
     end
 end
 
@@ -155,7 +155,7 @@ function get_material_tensors(
     analysis_type::DataType,
     mat::Material,
 )
-    if analysis_type in (Elastic_2DFEA, Elastic_3DFEA)
+    if analysis_type in (PlaneStrain_2DFEA, Elastic_3DFEA)
         return get_elastic_tensor(analysis_type, mat)
     elseif analysis_type==Thermo_Elastic_3DFEA
         return (

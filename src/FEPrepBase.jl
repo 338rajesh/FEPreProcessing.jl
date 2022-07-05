@@ -695,7 +695,6 @@ abstract type AbstractFEAnalysis end
 
 abstract type FEA_3Danalysis <: AbstractFEAnalysis end
 abstract type FEA_2Danalysis <: AbstractFEAnalysis end
-
 #
 struct Elastic_3DFEA <: FEA_3Danalysis end
 struct Piezo_Electric_3DFEA <: FEA_3Danalysis end
@@ -720,7 +719,7 @@ function get_nodal_dof(
 )::Tuple{Vararg{Symbol}}
     if analysis_type in (Elastic_3DFEA, Thermo_Elastic_3DFEA)
         return (:ux, :uy, :uz,)
-    elseif analysis_type === Elastic_2DFEA
+    elseif analysis_type <: Elastic_2DFEA
         return (:ux, :uy,)
     elseif analysis_type === Thermal_Conductivity_3DFEA
         return (:T,)
@@ -740,7 +739,7 @@ function get_material_matrix_size(
 )
     if analysis_type in (Elastic_3DFEA, Thermo_Elastic_3DFEA, )
         return (6, 6)
-    elseif analysis_type in (Elastic_2DFEA, Thermal_Conductivity_3DFEA, )
+    elseif (analysis_type <: Elastic_2DFEA) || (analysis_type <: Thermal_Conductivity_3DFEA)
         return (3, 3)
     elseif analysis_type == Piezo_Electric_3DFEA
         return (9, 9)
