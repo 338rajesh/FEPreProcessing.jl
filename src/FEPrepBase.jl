@@ -1,4 +1,6 @@
 
+const IF64 = Union{Int64, Float64}
+
 # ===================================================================
 #                       ERRORS
 # ===================================================================
@@ -490,7 +492,7 @@ function get_num_nodes_per_ele(e::DataType)
     elseif e===CPS3
         3
     else
-        @error "Element datatype $e is illegal, please provide correct element data type!."
+        @error "Element datatype $e is invalid, please provide correct element data type!."
     end
     return num_nodes_per_ele
 end
