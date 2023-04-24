@@ -109,7 +109,7 @@ function get_B_matrix(
     shf_grad_xyz::Union{SMatrix,Matrix},
     analysis_type::DataType
 )::Matrix{Float64}
-    if analysis_type in (PlaneStress_2DFEA, PlaneStrain_2DFEA)
+    if analysis_type in (PlaneStress_2DFEA, PlaneStrain_2DFEA, Thermo_Elastic_PlaneStrain_2DFEA)
         return get_strain_disp_matrix_2D(shf_grad_xyz)
     elseif analysis_type in (Elastic_3DFEA, Thermo_Elastic_3DFEA, )
         return get_strain_disp_matrix_3D(shf_grad_xyz)

@@ -712,7 +712,7 @@ struct Thermo_Magneto_Electro_Elastic_3DFEA <: FEA_3Danalysis end
 abstract type Elastic_2DFEA <: FEA_2Danalysis end
 struct PlaneStress_2DFEA <: Elastic_2DFEA end
 struct PlaneStrain_2DFEA <: Elastic_2DFEA end
-
+struct Thermo_Elastic_PlaneStrain_2DFEA <: Elastic_2DFEA end
 """
 Returns dof associated with each node for a given analysis and dimension
 """

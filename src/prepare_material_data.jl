@@ -120,7 +120,7 @@ function get_elastic_tensor(
             0.0 0.0 0.0 0.0 C66 0.0 
             0.0 0.0 0.0 0.0 0.0 C66
         ]
-    elseif analysis_type===PlaneStrain_2DFEA
+    elseif (analysis_type===PlaneStrain_2DFEA) || (analysis_type===Thermo_Elastic_PlaneStrain_2DFEA)
         return [
             C11 C12 0.0
             C12 C22 0.0
@@ -137,6 +137,8 @@ end
 
 
 get_thermal_expansion_vector(mat::IsotropicMaterial) = reshape([mat.alpha mat.alpha mat.alpha 0.0 0.0 0.0], 6, 1)
+
+thermal_expansion_vector_2D(mat::IsotropicMaterial) = reshape([mat.alpha mat.alpha 0.0], 3, 1)
 
 get_thermal_conductivity_tensor(mat::IsotropicMaterial) = [mat.K 0.0 0.0;0.0 mat.K 0.0; 0.0 0.0 mat.K]
 
@@ -157,6 +159,12 @@ function get_material_tensors(
 )
     if analysis_type in (PlaneStrain_2DFEA, Elastic_3DFEA)
         return get_elastic_tensor(analysis_type, mat)
+    elseif analysis_type == Thermo_Elastic_PlaneStrain_2DFEA
+        return (
+            get_elastic_tensor(analysis_type, mat),
+            thermal_expansion_vector_2D(mat),
+            mat.cv,
+        )
     elseif analysis_type==Thermo_Elastic_3DFEA
         return (
             get_elastic_tensor(analysis_type, mat),
