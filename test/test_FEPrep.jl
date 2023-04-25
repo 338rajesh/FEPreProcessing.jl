@@ -5,23 +5,22 @@ const UCM = UnitCellModelling
 using FEPreProcessing
 using Materials
 
-working_folder = mkpath(joinpath(homedir(), "WorkOuts", "scratch"))
 println("\t\t Testing FEPreProcessing module \n")
 
 # ============================================
 #           UNIT CELL GENERATION
 # ============================================
-r_mean::Float64 = 2.5
+r_mean::Float64 = 2.0
 r_std::Float64 = 0.0
-rve_size::Float64 = 2.0
+rve_size::Float64 = 30.0
 #
 volume_fractions = Dict{String, Float64}(
-    "Circles"       => 0.0,
-    "Ellipses"      => 0.0,
-    "nLobes"        => 0.01,
-    "Reg_Polygons"  => 0.0,
-    "Rectangles"    => 0.0,
-    "Capsules"      => 0.0,
+    "Circles"       => 0.1,
+    "Ellipses"      => 0.1,
+    "nLobes"        => 0.05,
+    "Reg_Polygons"  => 0.05,
+    "Rectangles"    => 0.05,
+    "Capsules"      => 0.05,
 )
 
 #
@@ -56,12 +55,12 @@ const ell_inc = Inclusion_data(
     shape=Ellipse,
     size_params=Dict(:SMJRX => Normal(2.0, 0.0), :SMNRX => Normal(1.0, 0.0),),
 )
-const rectangular_inclusions_data = Inclusion_data(
+const rect_inc = Inclusion_data(
     volume_fraction=volume_fractions["Rectangles"],
     shape=Rectangle,
     size_params=Dict(:SMJRX => Normal(2.0, 0.0), :SMNRX => Normal(1.0, 0.0), :CRAD => Normal(0.2, 0.0),),
 )
-inclusions_data = generate_unit_cell(ruc_info, (lobular_inc, ell_inc,), adjust_ruc_bbox=true,)
+inclusions_data = generate_unit_cell(ruc_info, (circ_inc, caps_inc, ell_inc, rect_inc, lobular_inc,), adjust_ruc_bbox=false,)
 
 
 # ============================================
@@ -82,8 +81,8 @@ ruc_model_data = make_unit_cell_model(
     extr_dir_num_ele=Int64[3,],
     extr_dir_cum_heights=Float64[1.0,],
     extr_dir_recombine_ele=true,
-    min_ele_size_factor=1/3,  #FIXME
-    max_ele_size_factor=1/1,
+    min_ele_size_factor=1/8,  #FIXME
+    max_ele_size_factor=1/4,
     mesh_opt_algorithm="Netgen",
     show_mesh_stats=true,
     show_rve=true,

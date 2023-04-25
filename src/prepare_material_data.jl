@@ -51,7 +51,7 @@ function get_elastic_tensor(
             0.0 0.0 0.0 0.0 kk2 0.0 
             0.0 0.0 0.0 0.0 0.0 kk2
         ]
-    elseif analysis_type===PlaneStrain_2DFEA
+    elseif analysis_type in (PlaneStrain_2DFEA, Thermo_Elastic_PlaneStrain_2DFEA)
         return kk1 * [
             1-nu nu 0.0
             nu 1-nu 0.0
@@ -69,76 +69,11 @@ function get_elastic_tensor(
 end
 
 
-function get_elastic_tensor(
-    analysis_type::DataType,
-    mat::OrthotropicMaterial,
-)::Matrix{Float64}
-    C11, C22, C33 = mat.c_ij[:C11], mat.c_ij[:C22], mat.c_ij[:C33]
-    C44, C55, C66 = mat.c_ij[:C44], mat.c_ij[:C55], mat.c_ij[:C66]
-    C12, C13, C23 = mat.c_ij[:C12], mat.c_ij[:C13], mat.c_ij[:C23]
-    @assert (C11>0 && C22>0 && C33>0 && C44>0 && C55>0 && C66>0) "Diagonal elements of C matrix must be positive but C11: $C11, C22: $C22, C33: $C33, C44: $C44, C55: $C55 and C66: $C66 are found."
-    if analysis_type in (Elastic_3DFEA, Thermo_Elastic_3DFEA, Piezo_Electric_3DFEA, Magneto_Electro_Elastic_3DFEA)  #FIXME 
-        return [
-            C11 C12 C13 0.0 0.0 0.0
-            C12 C22 C23 0.0 0.0 0.0
-            C13 C23 C33 0.0 0.0 0.0
-            0.0 0.0 0.0 C44 0.0 0.0 
-            0.0 0.0 0.0 0.0 C55 0.0 
-            0.0 0.0 0.0 0.0 0.0 C66
-        ]
-    elseif analysis_type===PlaneStrain_2DFEA
-        return kk1 * [
-            1-nu nu 0.0
-            nu 1-nu 0.0
-            0.0 0.0 kk2
-        ]
-    elseif analysis_type===PlaneStress_2DFEA
-        return (E/(1-(nu*nu))) * [
-            1 nu 0.0
-            nu 1 0.0
-            0.0 0.0 0.5*(1-nu)
-        ]
-    else
-        @error "Encountered an unknown analysis type for returning elastic tensor"
-    end
-end
-
-function get_elastic_tensor(
-    analysis_type::DataType,
-    mat::TransverselyIsotropicMaterial,
-)::Matrix{Float64}
-    C11, C22, C66 = mat.c_ij[:C11], mat.c_ij[:C22], mat.c_ij[:C66]
-    C12, C23 = mat.c_ij[:C12], mat.c_ij[:C23]
-    @assert (C11>0 && C22>0 && C66>0) "Diagonal elements of C matrix must be positive but C11: $C11, C22: $C22 and C66: $C66 are found."
-    @assert C22 > C23 "C22: $C22 > C23: $C23 leads to negative diagonal elements of C matrix."
-    if analysis_type===Elastic_3DFEA
-        return [
-            C11 C12 C12 0.0 0.0 0.0
-            C12 C22 C23 0.0 0.0 0.0
-            C12 C23 C22 0.0 0.0 0.0
-            0.0 0.0 0.0 0.5*(C22-C23) 0.0 0.0 
-            0.0 0.0 0.0 0.0 C66 0.0 
-            0.0 0.0 0.0 0.0 0.0 C66
-        ]
-    elseif (analysis_type===PlaneStrain_2DFEA) || (analysis_type===Thermo_Elastic_PlaneStrain_2DFEA)
-        return [
-            C11 C12 0.0
-            C12 C22 0.0
-            0.0 0.0 C66
-        ]  # FIXME
-    elseif analysis_type===PlaneStress_2DFEA
-        return [
-            C11 C12 0.0
-            C12 C22 0.0
-            0.0 0.0 C66
-        ]
-    end
-end
-
-
 get_thermal_expansion_vector(mat::IsotropicMaterial) = reshape([mat.alpha mat.alpha mat.alpha 0.0 0.0 0.0], 6, 1)
 
 thermal_expansion_vector_2D(mat::IsotropicMaterial) = reshape([mat.alpha mat.alpha 0.0], 3, 1)
+
+thermal_expansion_vector_plane_strain(mat::IsotropicMaterial) = (1.0 + mat.nu) * reshape([mat.alpha mat.alpha 0.0], 3, 1)
 
 get_thermal_conductivity_tensor(mat::IsotropicMaterial) = [mat.K 0.0 0.0;0.0 mat.K 0.0; 0.0 0.0 mat.K]
 
@@ -162,7 +97,8 @@ function get_material_tensors(
     elseif analysis_type == Thermo_Elastic_PlaneStrain_2DFEA
         return (
             get_elastic_tensor(analysis_type, mat),
-            thermal_expansion_vector_2D(mat),
+            # thermal_expansion_vector_2D(mat),
+            thermal_expansion_vector_plane_strain(mat),
             mat.cv,
         )
     elseif analysis_type==Thermo_Elastic_3DFEA

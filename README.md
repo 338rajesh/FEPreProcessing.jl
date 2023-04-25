@@ -81,14 +81,13 @@ julia> pc_node_tags = [(i.n1, i.n2) for i in node_pairs]
 
 ### Adding a new analysis type
 
-+ In `FEPrepBase.jl`,
-  + Define its structure using `sturct` 
-  + Update `get_nodal_dof()` and `get_material_matrix_size()`
-+ In `prepare_material_data.jl`,
-  + Update `get_material_tensors()` method and its dependencies like `get_elastic_tensor()`
-+ In `assembly.jl` 
-  + Update `get_B_matrix()` method
-
+* In `FEPrepBase.jl`,
+  * Define its structure using `sturct`
+  * Update `get_nodal_dof()` and `get_material_matrix_size()`
+* In `prepare_material_data.jl`,
+  * Update `get_material_tensors()` method and its dependencies like `get_elastic_tensor()`
+* In `assembly.jl`
+  * Update `get_B_matrix()` method
 
 ### Code (dependency) structure
 
