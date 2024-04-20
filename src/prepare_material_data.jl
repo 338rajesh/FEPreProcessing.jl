@@ -33,6 +33,22 @@ get_piezomagnetic_coupling_tensor(mat::OrthotropicMaterial)::Matrix{Float64} = [
 #           METHODS ON IsotropicMaterial
 # ===============================================
 
+function get_piezo_electric_material_tensor(mat::OrthotropicMaterial)::Matrix{Float64}
+    
+    return [
+        mat.c_ij[:C11]; mat.c_ij[:C12]; mat.c_ij[:C12];0.0;0.0;0.0;-mat.e_ij[:e11];0.0;0.0;;
+        mat.c_ij[:C12]; mat.c_ij[:C22]; mat.c_ij[:C23];0.0;0.0;0.0;-mat.e_ij[:e21];0.0;0.0;;
+        mat.c_ij[:C12]; mat.c_ij[:C23]; mat.c_ij[:C22];0.0;0.0;0.0;-mat.e_ij[:e21];0.0;0.0;;
+        0.0;0.0;0.0;mat.c_ij[:C44];0.0;0.0;0.0;0.0;0.0;;
+        0.0;0.0;0.0;0.0;mat.c_ij[:C55];0.0;0.0;0.0;-mat.e_ij[:e15];;
+        0.0;0.0;0.0;0.0;0.0;mat.c_ij[:C66];0.0;-mat.e_ij[:e15];0.0;;
+        -mat.e_ij[:e11];-mat.e_ij[:e21];-mat.e_ij[:e21];0.0;0.0;0.0;-mat.eps_ij[:eps_11];0.0;0.0;;
+        0.0;0.0;0.0;0.0;0.0;-mat.e_ij[:e15];0.0;-mat.eps_ij[:eps_22];0.0;;
+        0.0;0.0;0.0;0.0;-mat.e_ij[:e15];0.0;0.0;0.0;-mat.eps_ij[:eps_33];;
+    ]
+end
+
+
 function get_elastic_tensor(
     analysis_type::DataType,
     mat::IsotropicMaterial,
@@ -110,13 +126,14 @@ function get_material_tensors(
     elseif analysis_type==Thermal_Conductivity_3DFEA
         return get_thermal_conductivity_tensor(mat)
     elseif analysis_type==Piezo_Electric_3DFEA
-        Cmat = get_elastic_tensor(analysis_type, mat)
-        e_mat = get_piezoelectric_coupling_tensor(mat)
-        eps_mat = get_dielectric_tensor(mat)
-        return [
-            Cmat -e_mat;
-            -transpose(e_mat) -eps_mat;
-        ]
+        return get_piezo_electric_material_tensor(mat)
+        # Cmat = get_elastic_tensor(analysis_type, mat)
+        # e_mat = get_piezoelectric_coupling_tensor(mat)
+        # eps_mat = get_dielectric_tensor(mat)
+        # return [
+        #     Cmat -e_mat;
+        #     -transpose(e_mat) -eps_mat;
+        # ]
     elseif analysis_type==Magneto_Electro_Elastic_3DFEA
         Cmat = get_elastic_tensor(analysis_type, mat)
         e_mat = get_piezoelectric_coupling_tensor(mat)

@@ -234,6 +234,26 @@ struct FENodePair
 end
 
 abstract type AbstractFElementSet end
+abstract type AbstractNodeSet end
+
+@with_kw struct NodeSet <: AbstractNodeSet
+    tags::Vector{Int64}
+    coor::Matrix{Float64}
+    tag::Union{String,Int}
+end
+
+@with_kw struct NodePair
+    parent_tag::Int
+    child_tag::Int
+    parent_coor::Vector{Float64}
+    child_coor::Vector{Float64}
+    tag::Union{String,Int}
+end
+
+
+
+    
+
 
 """Structure for storing a particular type of finite elements"""
 @with_kw struct FiniteElementSet <: AbstractFElementSet
@@ -242,6 +262,11 @@ abstract type AbstractFElementSet end
     material::Union{Material, Nothing} = nothing
 end
 
+
+function bounding_box(points::Matrix{Float64})::NTuple{6,Float64}
+    ((x_min, x_max), (y_min, y_max), (z_min, z_max)) = extrema(points, dims=2)
+    return (x_min, y_min, z_min, x_max, y_max, z_max)
+end
 
 function get_num_ele(fele_set::FiniteElementSet)::Dict{DataType, Int}
     fele_type_summary::Dict{DataType, Int} = Dict{DataType, Int}()
